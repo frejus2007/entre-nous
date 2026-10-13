@@ -10,6 +10,17 @@
 -- les policies d'écriture directe sont volontairement absentes.
 -- =============================================================================
 
+-- =============================================================================
+-- Garde-fou d'ordre d'application : 0002 dépend des tables créées par 0001.
+-- =============================================================================
+do $$
+begin
+  if to_regclass('public.duos') is null or to_regclass('public.players') is null then
+    raise exception 'MIGRATION_ORDER: applique d''abord 0001_schema.sql. Les tables public.players / public.duos sont absentes.';
+  end if;
+end;
+$$;
+
 alter table public.players                  enable row level security;
 alter table public.duos                      enable row level security;
 alter table public.duo_members               enable row level security;
@@ -78,6 +89,39 @@ revoke all on function public.is_session_member(uuid) from public, anon;
 grant execute on function public.is_duo_member(uuid) to authenticated;
 grant execute on function public.is_duo_owner(uuid) to authenticated;
 grant execute on function public.is_session_member(uuid) to authenticated;
+
+-- =============================================================================
+-- Idempotence : on supprime les policies existantes avant de les recréer, afin
+-- que ce fichier puisse être rejoué sans erreur « policy already exists ».
+-- =============================================================================
+do $$
+declare
+  p record;
+begin
+  for p in
+    select * from (values
+      ('players', 'players_select_self'),
+      ('players', 'players_select_co_members'),
+      ('players', 'players_update_self'),
+      ('duos', 'duos_select_member'),
+      ('duo_members', 'duo_members_select_member'),
+      ('sessions', 'sessions_select_member'),
+      ('session_participants', 'session_participants_select_member'),
+      ('questions', 'questions_select_active'),
+      ('duo_used_questions', 'duo_used_questions_select_member'),
+      ('session_custom_questions', 'custom_questions_select_member'),
+      ('session_consents', 'consents_select_member'),
+      ('session_question_instances', 'instances_select_member'),
+      ('question_turns', 'turns_select_member'),
+      ('question_answers', 'answers_select_member'),
+      ('messages', 'messages_select_member'),
+      ('question_reports', 'reports_select_author')
+    ) as t(tbl, pol)
+  loop
+    execute format('drop policy if exists %I on public.%I', p.pol, p.tbl);
+  end loop;
+end;
+$$;
 
 -- =============================================================================
 -- players

@@ -7,6 +7,22 @@
 -- avoir vérifié elles-mêmes l'identité et les autorisations de l'appelant.
 -- =============================================================================
 
+-- =============================================================================
+-- Garde-fou d'ordre d'application.
+-- Ce fichier dépend des fonctions d'autorisation créées dans 0002_rls.sql.
+-- Sans ce contrôle, l'erreur affichée serait « function public.is_duo_member
+-- does not exist », difficile à diagnostiquer.
+-- =============================================================================
+do $$
+begin
+  if to_regprocedure('public.is_duo_member(uuid)') is null
+     or to_regprocedure('public.is_duo_owner(uuid)') is null
+     or to_regprocedure('public.is_session_member(uuid)') is null then
+    raise exception 'MIGRATION_ORDER: applique d''abord 0002_rls.sql. Les fonctions d''autorisation (public.is_duo_member / is_duo_owner / is_session_member) sont absentes.';
+  end if;
+end;
+$$;
+
 -- -----------------------------------------------------------------------------
 -- Helpers internes
 -- -----------------------------------------------------------------------------

@@ -28,7 +28,10 @@ cp .env.example .env.local   # renseigne l'URL + la clé anon
 
 ### 1. Appliquer le schéma
 
-Option A — via la CLI Supabase :
+Les fichiers **doivent être exécutés dans l'ordre** `0001` → `0005` : `0002`
+crée les fonctions d'autorisation utilisées par `0003`, etc.
+
+Option A — via la CLI Supabase (recommandé, applique tout dans l'ordre) :
 
 ```bash
 npm i -g supabase
@@ -37,7 +40,35 @@ supabase db push
 ```
 
 Option B — sans CLI : ouvre le **SQL Editor** du tableau de bord Supabase et
-exécute les fichiers de `supabase/migrations/` **dans l'ordre** (0001 → 0005).
+exécute les fichiers de `supabase/migrations/` **un par un, dans l'ordre** :
+
+1. `0001_schema.sql`
+2. `0002_rls.sql`
+3. `0003_rpc.sql`
+4. `0004_seed_questions.sql`
+5. `0005_realtime.sql`
+
+> ⚠️ Si tu obtiens `function public.is_duo_member(uuid) does not exist`, c'est
+> que `0002_rls.sql` n'a pas été exécuté avant `0003_rpc.sql`. Exécute `0002`,
+> puis relance `0003` (les migrations sont désormais rejouables sans risque).
+
+#### Vérifier que tout est en place
+
+```sql
+select proname
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+order by 1;
+```
+
+Tu dois y voir notamment `create_duo`, `draw_question`, `submit_answer`,
+`validate_answer`, `is_duo_member`. Et côté tables :
+
+```sql
+select tablename from pg_tables where schemaname = 'public' order by 1;
+```
+
 
 ### 2. Activer la connexion e-mail
 
