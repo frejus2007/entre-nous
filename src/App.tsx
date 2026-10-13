@@ -1,9 +1,8 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
-import { Spinner } from './components/feedback'
+import { ErrorAlert, Spinner } from './components/feedback'
 import { SetupRequired } from './pages/SetupRequired'
-import { AuthPage } from './pages/Auth'
 import { HomePage } from './pages/Home'
 import { DuoRoomPage } from './pages/DuoRoom'
 import { SessionPage } from './pages/Session'
@@ -12,8 +11,28 @@ import { PrivacyPage } from './pages/Privacy'
 import { InstallPage } from './pages/Install'
 import { GameEntryPage } from './pages/GameEntry'
 
+/** L'identité locale automatique n'a pas pu être créée (réglage Supabase). */
+function IdentityUnavailable({ message }: { message: string | null }) {
+  return (
+    <main className="container">
+      <div className="card stack">
+        <h1>Identité indisponible</h1>
+        <p className="muted">
+          L’application devait créer automatiquement une identité locale sur cet
+          appareil, mais le serveur l’a refusée.
+        </p>
+        <ErrorAlert message={message} />
+        <p className="small muted">
+          Dans Supabase : <em>Authentication → Sign In / Providers</em>, active{' '}
+          <strong>« Allow anonymous sign-ins »</strong>, puis recharge cette page.
+        </p>
+      </div>
+    </main>
+  )
+}
+
 export function App() {
-  const { session, loading } = useAuth()
+  const { session, loading, error } = useAuth()
 
   if (!isSupabaseConfigured) {
     return <SetupRequired />
@@ -22,13 +41,13 @@ export function App() {
   if (loading) {
     return (
       <main className="container">
-        <Spinner label="Chargement…" />
+        <Spinner label="Préparation de ton espace…" />
       </main>
     )
   }
 
   if (!session) {
-    return <AuthPage />
+    return <IdentityUnavailable message={error} />
   }
 
   return (

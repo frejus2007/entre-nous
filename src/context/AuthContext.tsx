@@ -12,55 +12,78 @@ import { supabase } from '../lib/supabase'
 interface AuthState {
   session: Session | null
   loading: boolean
-  /** Envoie un lien/code de connexion par e-mail (identité récupérable, §4.3). */
-  signInWithEmail: (email: string) => Promise<void>
-  verifyEmailCode: (email: string, token: string) => Promise<void>
-  signOut: () => Promise<void>
+  /** Message d'erreur si l'identité locale n'a pas pu être créée. */
+  error: string | null
+  /**
+   * Réinitialise l'identité de cet appareil (nouvel utilisateur anonyme).
+   * Utile pour tester à deux sur un même navigateur.
+   */
+  resetIdentity: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
 
+/**
+ * Identité automatique et invisible : aucune connexion demandée.
+ * L'application crée en arrière-plan un utilisateur Supabase anonyme, propre à
+ * cet appareil/navigateur. Le serveur continue de vérifier `auth.uid()` et la
+ * RLS (§16) : la sécurité n'est pas sacrifiée.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
+    let active = true
+
+    async function ensureIdentity() {
+      const existing = await supabase.auth.getSession()
+      if (!active) return
+      if (existing.data.session) {
+        setSession(existing.data.session)
+        setLoading(false)
+        return
+      }
+
+      const { data, error: signInError } = await supabase.auth.signInAnonymously()
+      if (!active) return
+      if (signInError) {
+        setError(signInError.message)
+      } else {
+        setSession(data.session)
+      }
       setLoading(false)
-    })
+    }
+
+    void ensureIdentity()
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
       setSession(next)
     })
 
-    return () => sub.subscription.unsubscribe()
+    return () => {
+      active = false
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   const value = useMemo<AuthState>(
     () => ({
       session,
       loading,
-      async signInWithEmail(email: string) {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: { shouldCreateUser: true },
-        })
-        if (error) throw new Error(error.message)
-      },
-      async verifyEmailCode(email: string, token: string) {
-        const { error } = await supabase.auth.verifyOtp({
-          email,
-          token,
-          type: 'email',
-        })
-        if (error) throw new Error(error.message)
-      },
-      async signOut() {
+      error,
+      async resetIdentity() {
         await supabase.auth.signOut()
+        const { data, error: signInError } = await supabase.auth.signInAnonymously()
+        if (signInError) setError(signInError.message)
+        else {
+          setError(null)
+          setSession(data.session)
+        }
       },
     }),
-    [session, loading],
+    [session, loading, error],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

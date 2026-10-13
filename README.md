@@ -82,11 +82,18 @@ select tablename from pg_tables where schemaname = 'public' order by 1;
 ```
 
 
-### 2. Activer la connexion e-mail
+### 2. Activer les identités anonymes
 
-Dans *Authentication → Providers*, active **Email**. C'est l'identité
-persistante et récupérable qui garantit qu'un duo est reconnu au fil du temps
-(cahier des charges §4.3) — un simple pseudonyme ne suffit pas.
+Dans *Authentication → Sign In / Providers*, active **« Allow anonymous
+sign-ins »**. L'application n'a **aucun écran de connexion** : à la première
+ouverture, elle crée automatiquement une identité locale (propre à l'appareil ou
+au navigateur) et s'en sert pour retrouver le duo.
+
+> Écart assumé par rapport au cahier des charges §4.3 (identité « récupérable ») :
+> demandé, le compte e-mail a été retiré. Conséquence : l'identité est liée à
+> l'appareil. Pour changer d'identité (tester à deux sur un même navigateur),
+> utilise une fenêtre de navigation privée, ou le bouton *« Réinitialiser
+> l'identité de cet appareil »* sur l'écran Confidentialité.
 
 ### 3. Lancer
 
@@ -114,7 +121,7 @@ entre-nous/
 │  └─ 0005_realtime.sql       # diffusion temps réel + durcissement
 └─ src/
    ├─ lib/                    # client Supabase, types, API (RPC), helpers
-   ├─ context/AuthContext.tsx # identité persistante (e-mail OTP)
+   ├─ context/AuthContext.tsx # identité locale automatique (anonyme, sans connexion)
    ├─ components/             # shell, navigation, feedback réseau
    └─ pages/                  # Accueil, Auth, Duo, Session (jeu), Chat, Confidentialité, Installation
 ```
@@ -175,6 +182,9 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 - **Design (§14)** : ambiance **claire, chaleureuse et intime** — crème/blush/corail,
   titres serif, cartes douces, boutons tactiles (48 px), responsive, navigation «
   Jeu » / « Chat » distincte, contraste non fondé uniquement sur la couleur.
+- **Identité (§4.3, adapté)** : pas de connexion. Identité locale anonyme créée
+  automatiquement par appareil ; le serveur authentifie toujours `auth.uid()` et
+  applique la RLS.
 
 ## Décisions encore à confirmer
 

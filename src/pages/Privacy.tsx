@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Layout } from '../components/Layout'
+import { useAuth } from '../context/AuthContext'
 import { CATEGORY_DESCRIPTIONS, CATEGORY_LABELS, CATEGORY_ORDER } from '../lib/categories'
 
 const DECISIONS = [
   'Les questions personnalisées sont supprimées à la fin ou à l’expiration de la session.',
-  'L’historique des questions du catalogue déjà posées est conservé par duo, pour empêcher toute répétition — même après déconnexion, fermeture du navigateur ou reconnexion depuis un autre appareil.',
-  'Le système reconnaît le même duo entre les sessions grâce à une identité persistante.',
+  'L’historique des questions du catalogue déjà posées est conservé par duo, pour empêcher toute répétition — même après fermeture du navigateur ou reconnexion.',
+  'Sur cet appareil, l’application crée automatiquement et sans aucune inscription une identité locale, qui permet de retrouver ton duo.',
   'Les réponses et les messages ne sont accessibles qu’aux deux membres autorisés du duo.',
 ]
 
@@ -19,7 +20,9 @@ const OPEN = [
 ]
 
 export function PrivacyPage() {
+  const { resetIdentity } = useAuth()
   const [duoId, setDuoId] = useState<string | null>(null)
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => {
     // Affichage du bouton de suppression si un duo courant est connu.
@@ -100,6 +103,34 @@ export function PrivacyPage() {
         <p className="small muted">
           Recommandation par défaut : supprimer réponses et messages à la fin de
           la session, sauf choix explicite de conserver un historique.
+        </p>
+      </div>
+
+      <div className="card stack">
+        <h2>Identité sur cet appareil</h2>
+        <p className="small muted">
+          Aucun compte, aucun e-mail, aucune inscription : l’application crée ici
+          une identité locale automatique. Elle suffit à retrouver ton duo sur ce
+          navigateur.
+        </p>
+        <button
+          type="button"
+          className="btn btn--soft"
+          disabled={resetting}
+          onClick={async () => {
+            setResetting(true)
+            await resetIdentity()
+            localStorage.removeItem('entre-nous:current-duo')
+            setDuoId(null)
+            setResetting(false)
+          }}
+        >
+          {resetting ? 'Réinitialisation…' : 'Réinitialiser l’identité de cet appareil'}
+        </button>
+        <p className="small muted">
+          Utile pour tester à deux depuis un même navigateur. À utiliser avec
+          précaution : un nouvel identifiant remplace l’ancien et il faudra
+          ressaisir le code du duo.
         </p>
       </div>
 

@@ -38,11 +38,12 @@ supabase db push
 # ou colle le contenu de supabase/migrations/*.sql dans le SQL Editor`}
         </pre>
 
-        <h3>4. Activer la connexion par e-mail</h3>
+        <h3>4. Activer les identités anonymes</h3>
         <p className="small muted">
-          Dans <em>Authentication → Providers</em>, active <em>Email</em>. C’est
-          l’identité persistante qui garantit l’absence de répétition des
-          questions pour un même duo (§4.3, §8.2).
+          Dans <em>Authentication → Sign In / Providers</em>, active{' '}
+          <em>« Allow anonymous sign-ins »</em>. L’application crée alors
+          automatiquement une identité locale sur chaque appareil, sans aucune
+          inscription ni e-mail : il n’y a pas d’écran de connexion.
         </p>
       </div>
     </main>
