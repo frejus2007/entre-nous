@@ -4,6 +4,15 @@
 -- durcit les droits des fonctions purement internes.
 -- =============================================================================
 
+-- Garde-fou d'ordre : 0005 s'appuie sur les fonctions RPC créées par 0003.
+do $$
+begin
+  if to_regprocedure('public.create_duo(text,text)') is null then
+    raise exception 'MIGRATION_ORDER: applique d''abord 0003_rpc.sql avant 0005_realtime.sql (les fonctions RPC sont absentes).';
+  end if;
+end;
+$$;
+
 -- Supabase Realtime ne diffuse que les tables inscrites dans la publication
 -- « supabase_realtime ». On l'active si elle existe (projet Supabase managé).
 do $$

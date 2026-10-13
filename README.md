@@ -28,10 +28,19 @@ cp .env.example .env.local   # renseigne l'URL + la clé anon
 
 ### 1. Appliquer le schéma
 
-Les fichiers **doivent être exécutés dans l'ordre** `0001` → `0005` : `0002`
-crée les fonctions d'autorisation utilisées par `0003`, etc.
+Il y a deux façons de faire. **La plus simple : le fichier unique `run_all.sql`.**
 
-Option A — via la CLI Supabase (recommandé, applique tout dans l'ordre) :
+#### Option A — un seul fichier (recommandé si tu utilises le SQL Editor)
+
+Ouvre `supabase/run_all.sql`, **copie tout son contenu** dans le **SQL Editor**
+du tableau de bord Supabase, puis exécute.
+
+Ce fichier regroupe `0001` → `0005` dans le bon ordre et il est **rejouable** :
+tu peux le relancer autant de fois que nécessaire, sans erreur
+« already exists ». Il sert aussi de **réparation** : si une étape précédente a
+échoué, le relancer remet la base dans l'état attendu.
+
+#### Option B — via la CLI Supabase (pour un projet suivi par migrations)
 
 ```bash
 npm i -g supabase
@@ -39,18 +48,21 @@ supabase link --project-ref <ref-du-projet>
 supabase db push
 ```
 
-Option B — sans CLI : ouvre le **SQL Editor** du tableau de bord Supabase et
-exécute les fichiers de `supabase/migrations/` **un par un, dans l'ordre** :
+La CLI applique `supabase/migrations/0001..0005` dans l'ordre. N'exécute
+`run_all.sql` **que** si tu n'utilises pas la CLI, pour éviter de doubler les
+migrations.
 
-1. `0001_schema.sql`
-2. `0002_rls.sql`
-3. `0003_rpc.sql`
-4. `0004_seed_questions.sql`
-5. `0005_realtime.sql`
+#### Option C — manuellement, fichier par fichier
 
-> ⚠️ Si tu obtiens `function public.is_duo_member(uuid) does not exist`, c'est
-> que `0002_rls.sql` n'a pas été exécuté avant `0003_rpc.sql`. Exécute `0002`,
-> puis relance `0003` (les migrations sont désormais rejouables sans risque).
+Dans le SQL Editor, exécute les fichiers de `supabase/migrations/` **un par un,
+dans l'ordre** : `0001_schema.sql`, `0002_rls.sql`, `0003_rpc.sql`,
+`0004_seed_questions.sql`, `0005_realtime.sql`.
+
+> ⚠️ L'ordre compte : `0002` crée les fonctions d'autorisation utilisées par
+> `0003`, et `0003` crée les fonctions RPC dont dépend `0005`. Si tu te trompes
+> d'ordre, les migrations affichent désormais un message explicite
+> (`MIGRATION_ORDER: applique d'abord …`) au lieu d'une erreur cryptique.
+> Le plus sûr reste l'option A.
 
 #### Vérifier que tout est en place
 
@@ -94,6 +106,7 @@ npm run preview  # prévisualiser le build
 entre-nous/
 ├─ public/                    # icônes PWA + favicon (générés sans dépendance)
 ├─ supabase/migrations/       # schéma, RLS, fonctions serveur, données, temps réel
+├─ supabase/run_all.sql       # les 5 migrations concaténées, à coller d'un coup (rejouable)
 │  ├─ 0001_schema.sql         # tables + types + contraintes
 │  ├─ 0002_rls.sql            # Row Level Security (isolation stricte des duos)
 │  ├─ 0003_rpc.sql            # LE SERVEUR EST LA SOURCE DE VÉRITÉ (§19)
