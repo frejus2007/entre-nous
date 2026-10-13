@@ -150,6 +150,7 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 | Épuisement explicite (§8.3) | `draw_question()` renvoie `{ ok: false, reason: 'catalog_exhausted' }` |
 | Réponses écrites non vides (§10) | `submit_answer()` refuse une réponse vide ; aucun champ vocal |
 | Validation par l'auteur de la question (§10.2) | `validate_answer()` — seul `asker_id` peut valider |
+| Alternance des tours « chacun son tour » (§10) | `next_asker_id()` — parité du nombre de tours : le créateur pose le 1er, puis les rôles s'inversent ; `draw_question()` refuse `NOT_YOUR_TURN` |
 | Pas de question suivante avant validation (§19) | `draw_question()` refuse si un tour est ouvert |
 | Clarification sans changer de question (§10.3) | état `clarification` persistant |
 | Sortie de sécurité (§10.4) | `abandon_instance()` — clôt l'interaction sans la valider, et journalise un signalement |
@@ -171,9 +172,9 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 - **Écrans (§13)** : Accueil, Création/accès duo, Invitation/attente, Préparation
   de session, Jeu, Clarification, Chat, Confidentialité, Fin de session,
   Installation.
-- **Design (§14)** : palette violet profond / corail / rose doux, cartes
-  arrondies, boutons tactiles (48 px), responsive, navigation « Jeu » / « Chat »
-  distincte, contraste non fondé uniquement sur la couleur.
+- **Design (§14)** : ambiance **claire, chaleureuse et intime** — crème/blush/corail,
+  titres serif, cartes douces, boutons tactiles (48 px), responsive, navigation «
+  Jeu » / « Chat » distincte, contraste non fondé uniquement sur la couleur.
 
 ## Décisions encore à confirmer
 

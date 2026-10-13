@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Génère les icônes PNG de la PWA sans dépendance externe (zlib + struct).
 
-Dessine un cœur corail/rose sur un fond dégradé violet profond, aux tailles
+Dessine un cœur crème sur un fond dégradé corail/rose, aux tailles
 192x192, 512x512 et 180x180 (apple-touch-icon).
 """
 import struct
@@ -22,19 +22,19 @@ def in_heart(nx, ny):
 
 
 def render(size):
-    # Couleurs
-    violet_haut = (76, 29, 149)     # #4C1D95
-    violet_bas = (18, 10, 42)       # #120A2A
-    rose = (255, 158, 205)          # #FF9ECD
-    corail = (255, 107, 107)        # #FF6B6B
+    # Couleurs — ambiance claire, chaleureuse et intime.
+    corail_haut = (224, 104, 92)    # #E0685C
+    rose_bas = (217, 122, 156)      # #D97A9C
+    creme = (255, 246, 240)         # #FFF6F0
+    rose_clair = (251, 227, 236)    # #FBE3EC
 
     rows = bytearray()
     for py in range(size):
         rows.append(0)  # filtre PNG type 0
         for px in range(size):
-            # Fond : dégradé diagonal
+            # Fond : dégradé diagonal corail -> rose
             t = (px + py) / (2 * (size - 1))
-            r, g, b = lerp(violet_haut, violet_bas, t)
+            r, g, b = lerp(corail_haut, rose_bas, t)
 
             # Coordonnées normalisées centrées
             nx = (px - size / 2) / (size * 0.34)
@@ -42,7 +42,7 @@ def render(size):
 
             if in_heart(nx, ny):
                 th = max(0.0, min(1.0, (ny + 1.0) / 2.0))
-                r, g, b = lerp(corail, rose, th)
+                r, g, b = lerp(rose_clair, creme, th)
 
             rows += bytes((r, g, b, 255))
     return bytes(rows)

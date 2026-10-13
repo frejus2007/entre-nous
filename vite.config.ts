@@ -20,8 +20,8 @@ export default defineConfig({
         description:
           'Deux personnes, des questions, des réponses écrites et un chat privé.',
         lang: 'fr',
-        theme_color: '#4C1D95',
-        background_color: '#120A2A',
+        theme_color: '#fbf6f1',
+        background_color: '#fbf6f1',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',

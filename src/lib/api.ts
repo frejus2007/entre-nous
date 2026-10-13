@@ -33,6 +33,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   WAITING_FOR_PARTNER: "Le second participant n'a pas encore rejoint.",
   TURN_IN_PROGRESS:
     'Une question est déjà en cours : termine-la avant d’en tirer une autre.',
+  NOT_YOUR_TURN:
+    'Ce n’est pas ton tour : c’est à ton partenaire de poser la question.',
   UNKNOWN_INSTANCE: 'Cette question n’existe plus.',
   NOT_THE_ANSWERER: 'Ce n’est pas à toi de répondre à cette question.',
   NOT_THE_ASKER: 'Seule la personne qui a posé la question peut valider.',

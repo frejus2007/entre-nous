@@ -104,6 +104,38 @@ as $$
   end::numeric;
 $$;
 
+-- Alternance des tours (§10) : « chacun à son tour ».
+-- Les rôles s'inversent à chaque tour : le tout premier poseur est le
+-- créateur de la session, puis on alterne. On se base sur le nombre de tours
+-- déjà entamés (parité), ce qui est déterministe et insensible à l'horloge.
+create or replace function public.next_asker_id(p_session uuid)
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  with s as (
+    select created_by, duo_id from public.sessions where id = p_session
+  ),
+  n as (
+    select count(*)::int as c
+    from public.session_question_instances
+    where session_id = p_session
+  )
+  select case
+    when (select c from n) % 2 = 0 then (select created_by from s)
+    else (
+      select dm.player_id
+      from public.duo_members dm
+      where dm.duo_id = (select duo_id from s)
+        and dm.player_id <> (select created_by from s)
+      order by dm.joined_at
+      limit 1
+    )
+  end;
+$$;
+
 -- =============================================================================
 -- DUOS
 -- =============================================================================
@@ -511,6 +543,7 @@ declare
   v_answerer uuid;
   v_instance uuid;
   v_open     int;
+  v_expected uuid;
 begin
   perform public.assert_session_member(p_session);
 
@@ -527,6 +560,12 @@ begin
   where session_id = p_session and state in ('awaiting_answer', 'awaiting_validation', 'clarification');
   if v_open > 0 then
     raise exception 'TURN_IN_PROGRESS';
+  end if;
+
+  -- §10 : « chacun à son tour ». Seul le poseur désigné peut tirer la question.
+  v_expected := public.next_asker_id(p_session);
+  if v_expected is not null and v_uid <> v_expected then
+    raise exception 'NOT_YOUR_TURN';
   end if;
 
   -- Le consentement 18+ n'est actif que si LES DEUX l'ont donné (§7.1).
@@ -911,6 +950,7 @@ begin
     'session', to_jsonb(v_sess),
     'duo', (select jsonb_build_object('id', d.id, 'name', d.name) from public.duos d where d.id = v_duo),
     'intimate_enabled', coalesce(v_intimate, false),
+    'next_asker_id', public.next_asker_id(p_session),
     'members', (
       select coalesce(jsonb_agg(jsonb_build_object(
         'player_id', dm.player_id,

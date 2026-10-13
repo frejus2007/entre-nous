@@ -363,7 +363,7 @@ function GameScreen(props: {
   members: SessionSnapshot['members']
 }) {
   const {
-    snap, turn, busy, pseudoOf, answer, setAnswer,
+    snap, turn, busy, myId, pseudoOf, answer, setAnswer,
     clarification, setClarification, showSafety, setShowSafety,
     showCustom, setShowCustom, customText, setCustomText,
     onDraw, onSubmitAnswer, onSubmitClarification, onValidate, onAbandon,
@@ -372,6 +372,10 @@ function GameScreen(props: {
 
   const mainAnswer = turn?.answers.find((a) => !a.is_clarification) ?? null
   const clarifications = turn?.answers.filter((a) => a.is_clarification) ?? []
+
+  // §10 : alternance « chacun son tour ». next_asker_id désigne le poseur.
+  const nextAsker = snap.next_asker_id
+  const myTurnToAsk = !nextAsker || nextAsker === myId
 
   return (
     <>
@@ -398,15 +402,44 @@ function GameScreen(props: {
       )}
 
       {snap.session.state === 'active' && !turn && (
-        <div className="card stack center">
-          <h2>Tirer une question</h2>
-          <p className="small muted">
-            Le serveur choisit la catégorie selon les probabilités, puis une
-            question jamais posée à votre duo.
-          </p>
-          <button className="btn" onClick={onDraw} disabled={busy}>
-            {busy ? 'Tirage…' : 'Nouvelle question'}
-          </button>
+        <div className="card stack">
+          {myTurnToAsk ? (
+            <div className="turn-banner turn-banner--me">
+              <span className="turn-banner__dot" aria-hidden="true" />
+              <span>
+                C’est <strong>à toi</strong> de poser la question.
+              </span>
+            </div>
+          ) : (
+            <div className="turn-banner turn-banner--wait">
+              <span className="turn-banner__dot" aria-hidden="true" />
+              <span>
+                C’est au tour de <strong>{pseudoOf(nextAsker)}</strong> de poser
+                la question.
+              </span>
+            </div>
+          )}
+
+          {myTurnToAsk ? (
+            <>
+              <p className="small muted center">
+                Le serveur choisit la catégorie selon les probabilités, puis une
+                question jamais posée à votre duo.
+              </p>
+              <button className="btn" onClick={onDraw} disabled={busy}>
+                {busy ? 'Tirage…' : 'Tirer une question'}
+              </button>
+            </>
+          ) : (
+            <div className="stack center">
+              <div className="spinner" role="status" aria-live="polite" />
+              <p className="small muted">
+                Tu répondras à sa question. Cette page se met à jour dès qu’il
+                l’a posée.
+              </p>
+            </div>
+          )}
+
           <button className="link-btn" onClick={() => setShowCustom(!showCustom)}>
             Ajouter une question personnalisée
           </button>

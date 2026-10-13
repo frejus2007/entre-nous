@@ -73,6 +73,8 @@ export interface SessionSnapshot {
   session: SessionRow
   duo: { id: string; name: string | null }
   intimate_enabled: boolean
+  /** Prochain poseur désigné (§10 : alternance « chacun son tour »). */
+  next_asker_id: string | null
   members: Member[]
   consents: Consent[]
   turn: Turn | null

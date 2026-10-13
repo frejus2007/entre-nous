@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Entre Nous">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4C1D95"/>
-      <stop offset="1" stop-color="#120A2A"/>
+      <stop offset="0" stop-color="#E0685C"/>
+      <stop offset="1" stop-color="#D97A9C"/>
     </linearGradient>
     <linearGradient id="heart" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FF9ECD"/>
-      <stop offset="1" stop-color="#FF6B6B"/>
+      <stop offset="0" stop-color="#FFF6F0"/>
+      <stop offset="1" stop-color="#FBE3EC"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="16" fill="url(#bg)"/>
