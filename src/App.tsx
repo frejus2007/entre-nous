@@ -12,8 +12,29 @@ import { PrivacyPage } from './pages/Privacy'
 import { InstallPage } from './pages/Install'
 import { GameEntryPage } from './pages/GameEntry'
 
+/**
+ * Vide le cache PWA (service worker + caches) et l'identité locale, puis
+ * recharge : récupère la dernière version publiée de l'application.
+ */
+async function hardReload() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys()
+      await Promise.all(keys.map((k) => caches.delete(k)))
+    }
+    localStorage.removeItem('entre-nous-auth')
+  } finally {
+    window.location.reload()
+  }
+}
+
 /** L'identité locale automatique n'a pas pu être créée (réglage Supabase). */
 function IdentityUnavailable({ message }: { message: string | null }) {
+  const invalidKey = /invalid api key/i.test(message ?? '')
   return (
     <main className="container">
       <div className="card stack">
@@ -23,10 +44,21 @@ function IdentityUnavailable({ message }: { message: string | null }) {
           appareil, mais le serveur l’a refusée.
         </p>
         <ErrorAlert message={message} />
-        <p className="small muted">
-          Dans Supabase : <em>Authentication → Sign In / Providers</em>, active{' '}
-          <strong>« Allow anonymous sign-ins »</strong>, puis recharge cette page.
-        </p>
+        {invalidKey ? (
+          <p className="small muted">
+            La clé Supabase de cette version de l’application est refusée. C’est
+            souvent une ancienne version restée en cache sur cet appareil :
+            appuie sur le bouton ci-dessous pour charger la dernière version.
+          </p>
+        ) : (
+          <p className="small muted">
+            Dans Supabase : <em>Authentication → Sign In / Providers</em>, active{' '}
+            <strong>« Allow anonymous sign-ins »</strong>, puis recharge cette page.
+          </p>
+        )}
+        <button type="button" className="btn" onClick={() => void hardReload()}>
+          Vider le cache et recharger
+        </button>
       </div>
     </main>
   )
