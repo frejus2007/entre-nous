@@ -9,9 +9,8 @@ import { currentSession } from '../lib/storage'
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
-  CATEGORY_WEIGHTS,
 } from '../lib/categories'
-import type { SessionSnapshot, Turn } from '../lib/types'
+import type { QuestionCategory, SessionSnapshot, Turn } from '../lib/types'
 
 export function SessionPage() {
   const { sessionId = '' } = useParams()
@@ -30,7 +29,18 @@ export function SessionPage() {
   const [customText, setCustomText] = useState('')
   const [adult, setAdult] = useState(false)
   const [intimate, setIntimate] = useState(false)
+  const [lastValidatedTurn, setLastValidatedTurn] = useState<Turn | null>(null)
+  const prevTurnRef = useRef<Turn | null>(null)
   const debounce = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (snap?.turn) {
+      prevTurnRef.current = snap.turn
+    } else if (prevTurnRef.current && (prevTurnRef.current.state === 'awaiting_validation' || prevTurnRef.current.state === 'clarification')) {
+      setLastValidatedTurn(prevTurnRef.current)
+      prevTurnRef.current = null
+    }
+  }, [snap?.turn])
 
   const refresh = useCallback(async () => {
     try {
@@ -127,6 +137,22 @@ export function SessionPage() {
 
   return (
     <Layout title="Jeu" hideNav>
+      <div className="row row--between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
+        <button
+          className="link-btn small"
+          onClick={() => navigate(`/duo/${session.duo_id}`)}
+          style={{ padding: '4px 0', textDecoration: 'none' }}
+        >
+          ← Mon Duo
+        </button>
+        <button
+          className="btn btn--soft btn--small"
+          onClick={() => navigate(`/chat/${session.duo_id}`)}
+        >
+          💬 Chat privé
+        </button>
+      </div>
+
       <OfflineBanner />
       <ErrorAlert message={error} />
       {notice && <div className="alert alert--info">{notice}</div>}
@@ -138,11 +164,15 @@ export function SessionPage() {
       {session.state === 'ready' && (
         <SetupScreen
           snap={snap}
+          myId={myId}
           adult={adult}
           intimate={intimate}
           setAdult={setAdult}
           setIntimate={setIntimate}
           busy={busy}
+          onSelectCategory={(category) =>
+            run(() => api.setSessionCategory(sessionId, category), 'Catégorie choisie pour la partie.')
+          }
           onSaveConsent={() => run(() => api.setConsent(sessionId, adult, intimate))}
           onStart={() => run(() => api.startSession(sessionId))}
         />
@@ -166,11 +196,13 @@ export function SessionPage() {
           customText={customText}
           setCustomText={setCustomText}
           onDraw={async () => {
+            setLastValidatedTurn(null)
             const res = await run(() => api.drawQuestion(sessionId))
             if (res && typeof res === 'object' && 'ok' in res && res.ok === false) {
               setNotice('Toutes les questions admissibles ont été posées pour ce duo. Le catalogue est épuisé — aucune question ne sera répétée (§8.3).')
             }
           }}
+          lastValidatedTurn={lastValidatedTurn}
           onSubmitAnswer={() =>
             run(() => api.submitAnswer(turn!.instance_id, answer), 'Réponse envoyée.').then((r) => {
               if (r) setAnswer('')
@@ -190,7 +222,10 @@ export function SessionPage() {
           onResume={() => run(() => api.resumeSession(sessionId))}
           onEnd={() => run(() => api.endSession(sessionId))}
           onAddCustom={() =>
-            run(() => api.addCustomQuestion(sessionId, customText, 'personnalite'), 'Question personnalisée ajoutée.').then((r) => {
+            run(
+              () => api.addCustomQuestion(sessionId, customText, snap.session.question_category ?? 'personnalite'),
+              'Question personnalisée ajoutée.',
+            ).then((r) => {
               if (r) {
                 setCustomText('')
                 setShowCustom(false)
@@ -247,53 +282,69 @@ function WaitingRoom({
 
 function SetupScreen({
   snap,
+  myId,
   adult,
   intimate,
   setAdult,
   setIntimate,
   busy,
+  onSelectCategory,
   onSaveConsent,
   onStart,
 }: {
   snap: SessionSnapshot
+  myId: string
   adult: boolean
   intimate: boolean
   setAdult: (v: boolean) => void
   setIntimate: (v: boolean) => void
   busy: boolean
+  onSelectCategory: (category: QuestionCategory) => void
   onSaveConsent: () => void
   onStart: () => void
 }) {
   const both = snap.intimate_enabled
+  const isOwner = snap.members.some((member) => member.player_id === myId && member.role === 'owner')
+  const selectedCategory = snap.session.question_category
+  const hasAvailableCategory = CATEGORY_ORDER.some((cat) => (snap.remaining_by_category[cat] ?? 0) > 0)
+  const intimateConsentMissing = selectedCategory === 'tres_intime' && !both
   return (
     <>
       <div className="card stack">
         <h1>Préparer la session</h1>
-        <p className="muted">
-          Voici les catégories et leur probabilité de tirage. Une catégorie
-          épuisée ou non autorisée est automatiquement retirée du tirage (§6.2).
-        </p>
-        <ul className="list">
-          {CATEGORY_ORDER.map((cat) => {
-            const remaining = snap.remaining_by_category[cat] ?? 0
-            const disabled = cat === 'tres_intime' && !both
-            return (
-              <li key={cat} className="card card--soft">
-                <div className="row row--between">
-                  <strong className="small">{CATEGORY_LABELS[cat]}</strong>
-                  <span className={`badge ${remaining === 0 ? 'badge--off' : 'badge--ok'}`}>
-                    {remaining} dispo.
-                  </span>
-                </div>
-                <div className="small muted">
-                  Poids {CATEGORY_WEIGHTS[cat]}%
-                  {disabled ? ' · désactivée tant que les deux consentements ne sont pas actifs' : ''}
-                  {remaining === 0 ? ' · épuisée' : ''}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <p className="muted">Le propriétaire choisit la catégorie de la partie. Toutes les questions tirées seront dans cette catégorie.</p>
+        <label className="field">
+          <span className="label">Catégorie de la partie</span>
+          <select
+            className="input"
+            value={selectedCategory ?? ''}
+            disabled={!isOwner || busy}
+            onChange={(event) => onSelectCategory(event.target.value as QuestionCategory)}
+          >
+            <option value="" disabled>Choisir une catégorie</option>
+            {CATEGORY_ORDER.map((cat) => {
+              const remaining = snap.remaining_by_category[cat] ?? 0
+              return (
+                <option key={cat} value={cat} disabled={remaining === 0}>
+                  {CATEGORY_LABELS[cat]} — {remaining} disponible{remaining === 1 ? '' : 's'}
+                </option>
+              )
+            })}
+          </select>
+        </label>
+        {!isOwner && (
+          <p className="small muted">En attente du choix du propriétaire de la partie.</p>
+        )}
+        {!hasAvailableCategory && (
+          <div className="alert alert--warn small">
+            Aucune question n’est disponible. Ajoute-en dans le catalogue depuis la page Administration.
+          </div>
+        )}
+        {selectedCategory && (
+          <div className="alert alert--info small">
+            La partie est configurée sur <strong>{CATEGORY_LABELS[selectedCategory]}</strong>.
+          </div>
+        )}
       </div>
 
       <div className="card stack">
@@ -322,11 +373,20 @@ function SetupScreen({
           moment, immédiatement (§7.2). État actuel :{' '}
           {both ? 'active ✓' : 'inactive'}.
         </p>
+        {intimateConsentMissing && (
+          <div className="alert alert--warn small">
+            Les deux participants doivent enregistrer leur consentement avant de démarrer dans cette catégorie.
+          </div>
+        )}
         <button className="btn btn--soft" onClick={onSaveConsent} disabled={busy}>
           Enregistrer mon consentement
         </button>
         <div className="divider" />
-        <button className="btn" onClick={onStart} disabled={busy}>
+        <button
+          className="btn"
+          onClick={onStart}
+          disabled={busy || !isOwner || !selectedCategory || intimateConsentMissing}
+        >
           {busy ? 'Démarrage…' : 'Démarrer le jeu'}
         </button>
       </div>
@@ -361,13 +421,14 @@ function GameScreen(props: {
   iAmAnswerer: boolean
   iAmAsker: boolean
   members: SessionSnapshot['members']
+  lastValidatedTurn: Turn | null
 }) {
   const {
     snap, turn, busy, myId, pseudoOf, answer, setAnswer,
     clarification, setClarification, showSafety, setShowSafety,
     showCustom, setShowCustom, customText, setCustomText,
     onDraw, onSubmitAnswer, onSubmitClarification, onValidate, onAbandon,
-    onResume, onEnd, onAddCustom, iAmAnswerer, iAmAsker,
+    onResume, onEnd, onAddCustom, iAmAnswerer, iAmAsker, lastValidatedTurn,
   } = props
 
   const mainAnswer = turn?.answers.find((a) => !a.is_clarification) ?? null
@@ -381,6 +442,9 @@ function GameScreen(props: {
     <>
       <div className="row row--between">
         <span className="badge">{snap.session.state === 'paused' ? 'En pause' : 'En jeu'}</span>
+        {snap.session.question_category && (
+          <span className="badge">{CATEGORY_LABELS[snap.session.question_category]}</span>
+        )}
         <span className="badge badge--off">
           {snap.intimate_enabled ? '18+ actif' : '18+ inactif'}
         </span>
@@ -403,6 +467,20 @@ function GameScreen(props: {
 
       {snap.session.state === 'active' && !turn && (
         <div className="card stack">
+          {lastValidatedTurn && (
+            <div className="card card--soft stack" style={{ borderLeft: '4px solid var(--success)', background: 'var(--surface-2)', padding: '0.75rem 1rem' }}>
+              <div className="row row--between">
+                <span className="badge badge--ok" style={{ fontSize: '0.75rem' }}>Dernière réponse validée ✓</span>
+                <span className="small muted">{CATEGORY_LABELS[lastValidatedTurn.category]}</span>
+              </div>
+              <p className="question-text small" style={{ margin: '4px 0', fontSize: '0.95rem' }}>{lastValidatedTurn.question}</p>
+              <div className="answer-box small" style={{ padding: '0.5rem 0.75rem', fontSize: '0.9rem' }}>
+                <strong>{pseudoOf(lastValidatedTurn.answerer_id)} :</strong>{' '}
+                {lastValidatedTurn.answers[lastValidatedTurn.answers.length - 1]?.body}
+              </div>
+            </div>
+          )}
+
           {myTurnToAsk ? (
             <div className="turn-banner turn-banner--me">
               <span className="turn-banner__dot" aria-hidden="true" />
@@ -423,8 +501,10 @@ function GameScreen(props: {
           {myTurnToAsk ? (
             <>
               <p className="small muted center">
-                Le serveur choisit la catégorie selon les probabilités, puis une
-                question jamais posée à votre duo.
+                Le serveur tire une question jamais posée à votre duo dans la
+                catégorie {snap.session.question_category
+                  ? CATEGORY_LABELS[snap.session.question_category]
+                  : 'choisie pour la partie'}.
               </p>
               <button className="btn" onClick={onDraw} disabled={busy}>
                 {busy ? 'Tirage…' : 'Tirer une question'}

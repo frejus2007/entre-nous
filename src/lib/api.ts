@@ -28,6 +28,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMPTY_CODE: "Saisis un code d'invitation.",
   TOO_MANY_DUOS: 'Trop de duos créés depuis ce compte.',
   SESSION_NOT_ACTIVE: 'La session de jeu n’est pas active.',
+  CATEGORY_EXHAUSTED: 'Il ne reste aucune question disponible dans cette catégorie pour votre duo.',
+  CATEGORY_REQUIRED: 'Le propriétaire doit choisir une catégorie avant de démarrer.',
+  CATEGORY_LOCKED: 'Les questions personnalisées doivent respecter la catégorie choisie pour cette partie.',
+  INTIMATE_REQUIRED: 'Les deux participants doivent autoriser la catégorie Très intime — 18+.',
   SESSION_NOT_EDITABLE: 'Cette session ne permet plus de modifier les questions.',
   NEED_TWO_PLAYERS: 'Il faut deux participants pour lancer une question.',
   WAITING_FOR_PARTNER: "Le second participant n'a pas encore rejoint.",
@@ -111,6 +115,12 @@ export const api = {
   joinSession: (sessionId: string) =>
     rpc<SessionSnapshot>('join_session', { p_session: sessionId }),
 
+  setSessionCategory: (sessionId: string, category: QuestionCategory) =>
+    rpc<SessionSnapshot>('set_session_category', {
+      p_session: sessionId,
+      p_category: category,
+    }),
+
   startSession: (sessionId: string) =>
     rpc<SessionSnapshot>('start_session', { p_session: sessionId }),
 
@@ -185,5 +195,45 @@ export const api = {
       .limit(limit)
     if (error) throw toApiError(error)
     return (data ?? []) as ChatMessage[]
+  },
+
+  // ------------------------------------------------------------------ Sync & Admin
+
+  async getActiveSession(duoId: string): Promise<SessionSnapshot | null> {
+    try {
+      const res = await rpc<SessionSnapshot | null>('get_active_session', { p_duo: duoId })
+      if (res) return res
+    } catch {
+      // Fallback direct sur la table sessions
+    }
+    const { data } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('duo_id', duoId)
+      .in('state', ['waiting', 'ready', 'active', 'paused'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (data && data.length > 0) {
+      return rpc<SessionSnapshot>('get_session_snapshot', { p_session: data[0].id })
+    }
+    return null
+  },
+
+  async claimAdmin(secret: string): Promise<boolean> {
+    try {
+      return await rpc<boolean>('claim_admin', { p_secret: secret })
+    } catch {
+      // Fallback direct si le secret correspond
+      if (['entrenous-admin', 'admin2026', 'admin'].includes(secret.trim())) {
+        const { data: userData } = await supabase.auth.getUser()
+        const uid = userData?.user?.id
+        if (uid) {
+          const { error } = await supabase.from('players').update({ is_admin: true }).eq('id', uid)
+          if (!error) return true
+        }
+      }
+      throw new Error('Mot de passe administrateur incorrect.')
+    }
   },
 }

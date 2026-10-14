@@ -43,6 +43,16 @@ export function GameEntryPage() {
           }
         }
 
+        // Si le second participant arrive ou si le cache local a été vidé,
+        // on retrouve la session en cours directement depuis le serveur (§20, §21).
+        const activeSnap = await api.getActiveSession(duo.id)
+        if (!alive) return
+        if (activeSnap && activeSnap.session.state !== 'finished') {
+          currentSession.set(activeSnap.session.id)
+          navigate(`/session/${activeSnap.session.id}`, { replace: true })
+          return
+        }
+
         navigate(`/duo/${duo.id}`, { replace: true })
       } catch {
         if (alive) navigate('/', { replace: true })

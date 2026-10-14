@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Layout } from '../components/Layout'
 import { ErrorAlert, OfflineBanner, Spinner } from '../components/feedback'
 import { api } from '../lib/api'
@@ -18,6 +18,7 @@ interface PendingMessage {
 
 export function ChatPage() {
   const { duoId } = useParams()
+  const navigate = useNavigate()
   const { session: authSession } = useAuth()
   const myId = authSession?.user.id ?? ''
 
@@ -154,6 +155,22 @@ export function ChatPage() {
 
   return (
     <Layout title="Chat privé" hideNav>
+      <div className="row row--between" style={{ marginBottom: '1rem', alignItems: 'center' }}>
+        <button
+          className="link-btn small"
+          onClick={() => navigate(`/duo/${duo.id}`)}
+          style={{ padding: '4px 0', textDecoration: 'none' }}
+        >
+          ← Mon Duo
+        </button>
+        <button
+          className="btn btn--soft btn--small"
+          onClick={() => navigate('/jeu')}
+        >
+          🎲 Jeu
+        </button>
+      </div>
+
       <OfflineBanner />
       <ErrorAlert message={error} />
 

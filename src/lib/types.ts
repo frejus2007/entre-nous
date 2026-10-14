@@ -62,6 +62,7 @@ export interface SessionRow {
   id: string
   duo_id: string
   state: SessionState
+  question_category: QuestionCategory | null
   started_at: string | null
   finished_at: string | null
   expires_at: string | null

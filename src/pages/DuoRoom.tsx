@@ -17,6 +17,7 @@ export function DuoRoomPage() {
     invite_expires_at: string | null
     invite_revoked: boolean
   } | null>(null)
+  const [activeSession, setActiveSession] = useState<{ id: string; state: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -30,6 +31,13 @@ export function DuoRoomPage() {
       if (found) {
         currentDuo.set(found.id)
         setInvite(await api.getDuoInvite(found.id))
+        const active = await api.getActiveSession(found.id)
+        if (active) {
+          setActiveSession({ id: active.session.id, state: active.session.state })
+          currentSession.set(active.session.id)
+        } else {
+          setActiveSession(null)
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chargement impossible.')
@@ -40,15 +48,31 @@ export function DuoRoomPage() {
     void load()
   }, [load])
 
-  // Le second participant peut arriver à tout moment : on écoute en temps réel.
+  // Le second participant et les sessions de jeu sont synchronisés en temps réel (§17.3).
   useEffect(() => {
     if (!duoId) return
     const channel = supabase
-      .channel(`duo-members-${duoId}`)
+      .channel(`duo-room-${duoId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'duo_members', filter: `duo_id=eq.${duoId}` },
         () => void load(),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'sessions', filter: `duo_id=eq.${duoId}` },
+        (payload) => {
+          const s = payload.new as { id?: string; state?: string }
+          if (s?.id && s?.state && ['waiting', 'ready', 'active', 'paused'].includes(s.state)) {
+            setActiveSession({ id: s.id, state: s.state })
+            currentSession.set(s.id)
+          } else if (s?.state === 'finished' || s?.state === 'expired') {
+            setActiveSession(null)
+            currentSession.clear()
+          } else {
+            void load()
+          }
+        },
       )
       .subscribe()
     return () => {
@@ -61,6 +85,11 @@ export function DuoRoomPage() {
     setBusy(true)
     setError(null)
     try {
+      if (activeSession) {
+        currentSession.set(activeSession.id)
+        navigate(`/session/${activeSession.id}`)
+        return
+      }
       const snap = await api.createSession(duo.id)
       currentSession.set(snap.session.id)
       navigate(`/session/${snap.session.id}`)
@@ -205,14 +234,27 @@ export function DuoRoomPage() {
 
       <div className="card stack">
         <h2>Session de jeu</h2>
-        <p className="small muted">
-          {duo.is_full
-            ? 'Vous êtes deux : la session peut démarrer.'
-            : 'Le second participant doit rejoindre avant de lancer le jeu.'}
-        </p>
-        <button className="btn" onClick={startGame} disabled={busy || !duo.is_full}>
-          {busy ? 'Préparation…' : 'Préparer une session'}
-        </button>
+        {activeSession ? (
+          <>
+            <div className="alert alert--info small">
+              Une session de jeu est actuellement <strong>{activeSession.state === 'active' ? 'en cours' : activeSession.state === 'paused' ? 'en pause' : 'prête'}</strong> pour votre duo.
+            </div>
+            <button className="btn" onClick={startGame} disabled={busy}>
+              Rejoindre la partie
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="small muted">
+              {duo.is_full
+                ? 'Vous êtes deux : la session peut démarrer.'
+                : 'Le second participant doit rejoindre avant de lancer le jeu.'}
+            </p>
+            <button className="btn" onClick={startGame} disabled={busy || !duo.is_full}>
+              {busy ? 'Préparation…' : 'Préparer une session'}
+            </button>
+          </>
+        )}
       </div>
     </Layout>
   )

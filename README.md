@@ -35,7 +35,8 @@ Il y a deux façons de faire. **La plus simple : le fichier unique `run_all.sql`
 Ouvre `supabase/run_all.sql`, **copie tout son contenu** dans le **SQL Editor**
 du tableau de bord Supabase, puis exécute.
 
-Ce fichier regroupe `0001` → `0005` dans le bon ordre et il est **rejouable** :
+Ce fichier regroupe le schéma, les fonctions et les droits d'administration.
+Les anciennes questions préremplies n'y sont plus incluses. Il est **rejouable** :
 tu peux le relancer autant de fois que nécessaire, sans erreur
 « already exists ». Il sert aussi de **réparation** : si une étape précédente a
 échoué, le relancer remet la base dans l'état attendu.
@@ -48,15 +49,25 @@ supabase link --project-ref <ref-du-projet>
 supabase db push
 ```
 
-La CLI applique `supabase/migrations/0001..0005` dans l'ordre. N'exécute
+La CLI applique `supabase/migrations/` dans l'ordre. N'exécute
 `run_all.sql` **que** si tu n'utilises pas la CLI, pour éviter de doubler les
 migrations.
 
 #### Option C — manuellement, fichier par fichier
 
 Dans le SQL Editor, exécute les fichiers de `supabase/migrations/` **un par un,
-dans l'ordre** : `0001_schema.sql`, `0002_rls.sql`, `0003_rpc.sql`,
-`0004_seed_questions.sql`, `0005_realtime.sql`.
+dans l'ordre** : les migrations `0001` à `0010`.
+Les migrations de catalogue `0004` et `0006` sont historiques ; `0009` supprime
+leurs questions afin que le catalogue soit vide au terme de l'installation.
+
+Si la base est déjà installée, applique `0009_clear_question_catalog.sql` (ou
+utilise `supabase db push`) pour supprimer toutes les questions existantes.
+Cette migration conserve les tours passés, dont la référence de question est
+mise à `NULL`. Les questions ajoutées ensuite depuis la page Administration ne
+seront pas supprimées par la réexécution de `run_all.sql`.
+
+La migration `0010_session_category.sql` ajoute le choix de catégorie par le
+propriétaire avant le démarrage d’une partie.
 
 > ⚠️ L'ordre compte : `0002` crée les fonctions d'autorisation utilisées par
 > `0003`, et `0003` crée les fonctions RPC dont dépend `0005`. Si tu te trompes
@@ -103,6 +114,19 @@ npm run build    # build de production
 npm run preview  # prévisualiser le build
 ```
 
+### 4. Héberger sur Netlify
+
+Importe le dépôt GitHub dans Netlify. Le fichier `netlify.toml` configure déjà
+la commande de build (`npm run build`), le dossier publié (`dist`) et le
+fallback nécessaire aux routes de l'application.
+
+Dans les variables d'environnement du site Netlify, ajoute :
+
+- `VITE_SUPABASE_URL` : l'URL du projet Supabase.
+- `VITE_SUPABASE_ANON_KEY` : la clé publique `anon` du projet Supabase.
+
+Ne configure jamais la clé `service_role` dans Netlify côté client.
+
 > Le fichier `.env.local` ne contient **que** l'URL et la clé **publique**
 > `anon`. La clé `service_role` ne doit **jamais** être exposée au navigateur
 > (§16.9).
@@ -113,12 +137,15 @@ npm run preview  # prévisualiser le build
 entre-nous/
 ├─ public/                    # icônes PWA + favicon (générés sans dépendance)
 ├─ supabase/migrations/       # schéma, RLS, fonctions serveur, données, temps réel
-├─ supabase/run_all.sql       # les 5 migrations concaténées, à coller d'un coup (rejouable)
+├─ supabase/run_all.sql       # schéma, fonctions et configuration admin (rejouable)
 │  ├─ 0001_schema.sql         # tables + types + contraintes
 │  ├─ 0002_rls.sql            # Row Level Security (isolation stricte des duos)
 │  ├─ 0003_rpc.sql            # LE SERVEUR EST LA SOURCE DE VÉRITÉ (§19)
-│  ├─ 0004_seed_questions.sql # catalogue initial (7 catégories)
-│  └─ 0005_realtime.sql       # diffusion temps réel + durcissement
+│  ├─ 0004_seed_questions.sql # migration historique, catalogue initial
+│  ├─ 0005_realtime.sql       # diffusion temps réel + durcissement
+│  ├─ 0006_seed_catalog.sql   # migration historique, catalogue étendu
+│  ├─ 0009_clear_question_catalog.sql # supprime les questions préremplies existantes
+│  └─ 0010_session_category.sql # choix de catégorie avant le démarrage
 └─ src/
    ├─ lib/                    # client Supabase, types, API (RPC), helpers
    ├─ context/AuthContext.tsx # identité locale automatique (anonyme, sans connexion)
@@ -142,6 +169,8 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 
 - **RLS activée partout.** Aucune policy d'écriture directe sur les tables
   sensibles : tout passe par les RPC.
+- **Catalogue vide au démarrage.** Ajoute les questions et leur catégorie
+  depuis la page Administration ; chaque question est saisie sur une ligne.
 - `duo_used_questions` a une clé primaire composite `(duo_id, question_id)` :
   une question ne peut pas être enregistrée deux fois pour un duo (§18).
 - Un trigger interdit un troisième membre dans un duo (§4.1).
@@ -151,8 +180,8 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 
 | Règle du cahier des charges | Implémentation |
 | --- | --- |
-| Tirage aléatoire pondéré (§6.1) | `draw_question()` — poids 18+ 50 %, pimenté 25 %, amour 10 %, secrets 5 %, personnalité 5 %, brise-glace 3 %, avenir 2 % |
-| Recalcul / renormalisation (§6.2) | catégories non autorisées, sans consentement ou épuisées exclues avant tirage |
+| Choix de catégorie | Le propriétaire sélectionne une catégorie avant de démarrer ; `draw_question()` ne tire que dans cette catégorie |
+| Disponibilité des questions | Les catégories épuisées sont désactivées ; le consentement des deux participants reste requis pour Très intime — 18+ |
 | Jamais de répétition (§8) | marquage `duo_used_questions` **dans la même transaction** que l'attribution ; jamais de recyclage |
 | Épuisement explicite (§8.3) | `draw_question()` renvoie `{ ok: false, reason: 'catalog_exhausted' }` |
 | Réponses écrites non vides (§10) | `submit_answer()` refuse une réponse vide ; aucun champ vocal |

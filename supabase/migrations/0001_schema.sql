@@ -204,12 +204,21 @@ create table if not exists public.session_question_instances (
   answerer_id       uuid not null references public.players (id) on delete cascade,
   created_at        timestamptz not null default now(),
   check (
-    (kind = 'catalog' and question_id is not null and custom_question_id is null)
+    (kind = 'catalog' and custom_question_id is null)
     or
     (kind = 'custom'  and custom_question_id is not null and question_id is null)
   ),
   check (asker_id <> answerer_id)
 );
+
+alter table public.session_question_instances
+  drop constraint if exists session_question_instances_check;
+alter table public.session_question_instances
+  add constraint session_question_instances_check check (
+    (kind = 'catalog' and custom_question_id is null)
+    or
+    (kind = 'custom' and custom_question_id is not null and question_id is null)
+  );
 
 create index if not exists instances_session_idx on public.session_question_instances (session_id, created_at desc);
 
