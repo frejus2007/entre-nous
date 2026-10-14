@@ -7,6 +7,7 @@ import { HomePage } from './pages/Home'
 import { DuoRoomPage } from './pages/DuoRoom'
 import { SessionPage } from './pages/Session'
 import { ChatPage } from './pages/Chat'
+import Admin from './pages/Admin'
 import { PrivacyPage } from './pages/Privacy'
 import { InstallPage } from './pages/Install'
 import { GameEntryPage } from './pages/GameEntry'
@@ -60,7 +61,8 @@ export function App() {
       <Route path="/chat/:duoId" element={<ChatPage />} />
       <Route path="/confidentialite" element={<PrivacyPage />} />
       <Route path="/installer" element={<InstallPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route path="/admin" element={<Admin />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
