@@ -1,7 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 
-const url = import.meta.env.VITE_SUPABASE_URL
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+function normalizeEnvValue(value: string | undefined): string {
+  return value?.trim().replace(/^(['"])(.*)\1$/, '$2').trim() ?? ''
+}
+
+const url = normalizeEnvValue(import.meta.env.VITE_SUPABASE_URL)
+const anonKey = normalizeEnvValue(import.meta.env.VITE_SUPABASE_ANON_KEY)
 
 /**
  * true si le projet Supabase est configuré.
