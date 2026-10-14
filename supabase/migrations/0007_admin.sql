@@ -112,3 +112,71 @@ revoke all on function public._admin_next_code(public.question_category) from pu
 grant execute on function public._admin_next_code(public.question_category) to authenticated;
 revoke all on function public.admin_import_questions(public.question_category, text[]) from public, anon;
 grant execute on function public.admin_import_questions(public.question_category, text[]) to authenticated;
+
+create or replace function public.admin_import_questions(
+  p_category public.question_category,
+  p_questions text[]
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_q   text;
+  v_body text;
+  v_code text;
+  v_ins int := 0;
+  v_dup int := 0;
+  v_skip int := 0;
+  v_len int;
+begin
+  if v_uid is null then
+    raise exception 'NOT_AUTHENTICATED';
+  end if;
+  if not public.is_admin() then
+    raise exception 'NOT_ADMIN';
+  end if;
+  if p_questions is null then
+    return jsonb_build_object('inserted', 0, 'duplicates', 0, 'skipped', 0);
+  end if;
+  foreach v_q in array p_questions loop
+    v_q := trim(v_q);
+    if v_q = '' then
+      v_skip := v_skip + 1;
+      continue;
+    end if;
+    if left(v_q, 1) = '#' then
+      v_skip := v_skip + 1;
+      continue;
+    end if;
+    v_body := v_q;
+    if char_length(v_body) > 400 then
+      v_body := left(v_body, 397) || '...';
+    end if;
+    v_len := char_length(btrim(v_body));
+    if v_len < 5 or v_len > 400 then
+      v_skip := v_skip + 1;
+      continue;
+    end if;
+    if exists (
+      select 1 from public.questions q
+      where q.category = p_category
+        and lower(regexp_replace(q.body, '\s+', ' ', 'g')) =
+            lower(regexp_replace(v_body,  '\s+', ' ', 'g'))
+    ) then
+      v_dup := v_dup + 1;
+      continue;
+    end if;
+    v_code := public._admin_next_code(p_category);
+    insert into public.questions (code, category, body, is_active)
+    values (v_code, p_category, v_body, true)
+    on conflict (code) do nothing;
+    v_ins := v_ins + 1;
+  end loop;
+  return jsonb_build_object('inserted',v_ins,'duplicates',v_dup,'skipped',v_skip,'total',array_length(p_questions,1));
+end;
+$$;
+revoke all on function public.admin_import_questions(public.question_category, text[]) from public, anon;
+grant execute on function public.admin_import_questions(public.question_category, text[]) to authenticated;
