@@ -224,11 +224,12 @@ export function SessionPage() {
           onAddCustom={() =>
             run(
               () => api.addCustomQuestion(sessionId, customText, snap.session.question_category ?? 'personnalite'),
-              'Question personnalisée ajoutée.',
+              'Question personnalisée ajoutée et lancée.',
             ).then((r) => {
               if (r) {
                 setCustomText('')
                 setShowCustom(false)
+                setLastValidatedTurn(null)
               }
             })
           }
@@ -520,22 +521,26 @@ function GameScreen(props: {
             </div>
           )}
 
-          <button className="link-btn" onClick={() => setShowCustom(!showCustom)}>
-            Ajouter une question personnalisée
-          </button>
-          {showCustom && (
-            <div className="stack">
-              <textarea
-                className="textarea"
-                value={customText}
-                maxLength={400}
-                onChange={(e) => setCustomText(e.target.value)}
-                placeholder="Une question pour cette session uniquement…"
-              />
-              <button className="btn btn--soft" onClick={onAddCustom} disabled={busy || customText.trim().length < 5}>
-                Ajouter
+          {myTurnToAsk && (
+            <>
+              <button className="link-btn" onClick={() => setShowCustom(!showCustom)}>
+                Ajouter une question personnalisée
               </button>
-            </div>
+              {showCustom && (
+                <div className="stack">
+                  <textarea
+                    className="textarea"
+                    value={customText}
+                    maxLength={400}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    placeholder="Une question pour cette session uniquement…"
+                  />
+                  <button className="btn btn--soft" onClick={onAddCustom} disabled={busy || customText.trim().length < 5}>
+                    Ajouter
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

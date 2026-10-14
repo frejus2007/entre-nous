@@ -56,7 +56,7 @@ migrations.
 #### Option C — manuellement, fichier par fichier
 
 Dans le SQL Editor, exécute les fichiers de `supabase/migrations/` **un par un,
-dans l'ordre** : les migrations `0001` à `0010`.
+dans l'ordre** : les migrations `0001` à `0011`.
 Les migrations de catalogue `0004` et `0006` sont historiques ; `0009` supprime
 leurs questions afin que le catalogue soit vide au terme de l'installation.
 
@@ -68,6 +68,9 @@ seront pas supprimées par la réexécution de `run_all.sql`.
 
 La migration `0010_session_category.sql` ajoute le choix de catégorie par le
 propriétaire avant le démarrage d’une partie.
+La migration `0011_custom_question_immediate.sql` affiche immédiatement une
+question personnalisée dans le tour en cours, au lieu de la mettre en attente
+dans le prochain tirage.
 
 > ⚠️ L'ordre compte : `0002` crée les fonctions d'autorisation utilisées par
 > `0003`, et `0003` crée les fonctions RPC dont dépend `0005`. Si tu te trompes
@@ -145,7 +148,8 @@ entre-nous/
 │  ├─ 0005_realtime.sql       # diffusion temps réel + durcissement
 │  ├─ 0006_seed_catalog.sql   # migration historique, catalogue étendu
 │  ├─ 0009_clear_question_catalog.sql # supprime les questions préremplies existantes
-│  └─ 0010_session_category.sql # choix de catégorie avant le démarrage
+│  ├─ 0010_session_category.sql # choix de catégorie avant le démarrage
+│  └─ 0011_custom_question_immediate.sql # lance immédiatement la question ajoutée
 └─ src/
    ├─ lib/                    # client Supabase, types, API (RPC), helpers
    ├─ context/AuthContext.tsx # identité locale automatique (anonyme, sans connexion)
