@@ -1741,7 +1741,6 @@ insert into public.questions (code, category, body) values
   ('ti-192', 'tres_intime', 'Si on était seuls, tu me dirais « fais-moi ce que tu veux » ?')
 on conflict (code) do nothing;
 
-
 -- Avenir et relations (311 questions)
 insert into public.questions (code, category, body) values
   ('av-101', 'avenir', 'Quel projet aimerais-tu qu''on planifie ce trimestre ?'),
