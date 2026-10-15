@@ -56,7 +56,7 @@ migrations.
 #### Option C — manuellement, fichier par fichier
 
 Dans le SQL Editor, exécute les fichiers de `supabase/migrations/` **un par un,
-dans l'ordre** : les migrations `0001` à `0013`.
+dans l'ordre** : les migrations `0001` à `0015`.
 Les migrations de catalogue `0004` et `0006` sont historiques ; `0009` supprime
 leurs questions afin que le catalogue soit vide au terme de l'installation.
 
@@ -74,6 +74,25 @@ dans le prochain tirage.
 La migration `0013_remove_chat_reactions.sql` supprime la fonctionnalité de
 réactions du chat et nettoie les données associées si la migration `0012` avait
 déjà été appliquée.
+La migration `0014_intimate_conversation_mode.sql` ajoute un salon de
+conversation libre réservé aux adultes, soumis à l'accord des deux participants.
+Les niveaux d'envie sont privés et supprimés après la décision ; si le mode ne
+démarre pas après deux accords, l'application propose la partie « Très intime —
+18+ » classique lorsqu'une question est disponible. Les messages du salon
+restent dans l'historique du chat du duo.
+La migration `0015_admin_intimate_mode_lock.sql` verrouille ce mode par défaut
+et ajoute son activation/désactivation depuis l'administration. Les anciens
+mots de passe partagés ne donnent plus les droits administrateur.
+
+Pour attribuer les droits au premier administrateur, repère l'identité du
+responsable dans `public.players` depuis le SQL Editor Supabase, puis marque son
+UUID :
+
+```sql
+update public.players set is_admin = true where id = '<UUID_DU_RESPONSABLE>';
+```
+
+Les changements ultérieurs de ce rôle ne sont pas autorisés depuis le navigateur.
 
 > ⚠️ L'ordre compte : `0002` crée les fonctions d'autorisation utilisées par
 > `0003`, et `0003` crée les fonctions RPC dont dépend `0005`. Si tu te trompes
@@ -152,11 +171,13 @@ entre-nous/
 │  ├─ 0006_seed_catalog.sql   # migration historique, catalogue étendu
 │  ├─ 0009_clear_question_catalog.sql # supprime les questions préremplies existantes
 │  ├─ 0010_session_category.sql # choix de catégorie avant le démarrage
-│  └─ 0011_custom_question_immediate.sql # lance immédiatement la question ajoutée
+│  ├─ 0011_custom_question_immediate.sql # lance immédiatement la question ajoutée
+│  ├─ 0014_intimate_conversation_mode.sql # conversation libre privée entre adultes
+│  └─ 0015_admin_intimate_mode_lock.sql # activation réservée aux administrateurs
 └─ src/
    ├─ lib/                    # client Supabase, types, API (RPC), helpers
    ├─ context/AuthContext.tsx # identité locale automatique (anonyme, sans connexion)
-   ├─ components/             # shell, navigation, feedback réseau
+   ├─ components/             # shell, navigation, introduction progressive à la confidentialité
    └─ pages/                  # Accueil, Auth, Duo, Session (jeu), Chat, Confidentialité, Installation
 ```
 
@@ -166,13 +187,17 @@ manifeste, service worker), React Router.
 **Backend** : Supabase (PostgreSQL + Auth + Realtime). Toutes les opérations
 sensibles passent par des fonctions PostgreSQL `SECURITY DEFINER` exposées en
 RPC (`supabase.rpc(...)`), qui vérifient elles-mêmes l'identité et les droits.
+À la première visite, cinq écrans courts présentent les règles d'une discussion
+sexuelle entre deux adultes consentants ; leur lecture est mémorisée sur l'appareil.
 
 ## Base de données
 
 Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 `session_participants`, `questions`, `duo_used_questions`,
 `session_custom_questions`, `session_consents`, `session_question_instances`,
-`question_turns`, `question_answers`, `messages`, `question_reports`.
+`question_turns`, `question_answers`, `messages`, `question_reports`,
+`intimate_mode_rooms`, `intimate_mode_participants`,
+`intimate_mode_readiness`, `platform_features`.
 
 - **RLS activée partout.** Aucune policy d'écriture directe sur les tables
   sensibles : tout passe par les RPC.
@@ -200,6 +225,8 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 | Consentement des deux (§7.1) | `set_consent()` + contrôle serveur avant tout tirage 18+ |
 | Retrait immédiat (§7.2) | met la session en pause si une question intime est en cours |
 | Chat indépendant du jeu (§11.2) | `send_message()` ne touche jamais l'état du jeu |
+| Accès au mode conversation très intime | Verrouillé par défaut ; seules les RPC admin peuvent l'activer, et des gardes serveur bloquent salons, préparation et messages lorsqu'il est désactivé |
+| Conversation libre réservée aux adultes | `submit_intimate_mode_checkin()` requiert l'accord de chacun ; les niveaux sont privés et supprimés dès le choix du mode ; arrêter le mode coupe immédiatement l'envoi |
 | Suppression réelle des questions perso (§9) | `DELETE` serveur dans `end_session()` |
 | Résistance aux doubles clics (§16.13) | contrainte « un seul tour ouvert » + transactions |
 | Reprise après reconnexion (§20) | `get_session_snapshot()` renvoie l'état réel serveur |

@@ -2,6 +2,7 @@ import { supabase } from './supabase'
 import type {
   ChatMessage,
   DuoSummary,
+  IntimateModeSnapshot,
   QuestionCategory,
   SessionSnapshot,
 } from './types'
@@ -48,6 +49,12 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMPTY_ANSWER: 'La réponse ne peut pas être vide.',
   EMPTY_MESSAGE: 'Le message ne peut pas être vide.',
   MESSAGE_TOO_LONG: 'Le message est trop long.',
+  INTIMATE_MODE_NOT_FOUND: 'Cette conversation intime est introuvable.',
+  INTIMATE_MODE_NOT_ACTIVE: 'Cette conversation intime n’est plus ouverte.',
+  INVALID_READINESS_LEVEL: 'Le niveau indiqué est invalide.',
+  INTIMATE_MODE_DISABLED: 'Ce mode est temporairement désactivé par l’administration.',
+  NOT_ADMIN: 'Cette action est réservée à l’administration.',
+  ADMIN_ASSIGNMENT_REQUIRED: 'Les droits administrateur doivent être attribués par le responsable du projet.',
   QUESTION_TOO_SHORT: 'La question est trop courte.',
   QUESTION_NOT_ALLOWED:
     'Cette question contient un contenu non autorisé (demande de photo intime, menace ou contrainte).',
@@ -186,6 +193,36 @@ export const api = {
       p_session: sessionId ?? null,
     }),
 
+  createIntimateMode: (duoId: string) =>
+    rpc<IntimateModeSnapshot>('create_intimate_mode', { p_duo: duoId }),
+
+  getOpenIntimateMode: (duoId: string) =>
+    rpc<IntimateModeSnapshot | null>('get_open_intimate_mode', { p_duo: duoId }),
+
+  getIntimateMode: (roomId: string) =>
+    rpc<IntimateModeSnapshot>('get_intimate_mode_snapshot', { p_room: roomId }),
+
+  submitIntimateModeCheckin: (
+    roomId: string,
+    isAdult: boolean,
+    acceptsMode: boolean,
+    acceptsPrivacyPledge: boolean,
+    excitement: number,
+  ) =>
+    rpc<IntimateModeSnapshot>('submit_intimate_mode_checkin', {
+      p_room: roomId,
+      p_is_adult: isAdult,
+      p_accepts_mode: acceptsMode,
+      p_accepts_privacy_pledge: acceptsPrivacyPledge,
+      p_excitement: excitement,
+    }),
+
+  sendIntimateModeMessage: (roomId: string, body: string) =>
+    rpc<ChatMessage>('send_intimate_mode_message', { p_room: roomId, p_body: body }),
+
+  endIntimateMode: (roomId: string) =>
+    rpc<IntimateModeSnapshot>('end_intimate_mode', { p_room: roomId }),
+
   async listMessages(duoId: string, limit = 100): Promise<ChatMessage[]> {
     const { data, error } = await supabase
       .from('messages')
@@ -193,6 +230,17 @@ export const api = {
       .eq('duo_id', duoId)
       .order('created_at', { ascending: true })
       .limit(limit)
+    if (error) throw toApiError(error)
+    return (data ?? []) as ChatMessage[]
+  },
+
+  async listIntimateModeMessages(duoId: string, roomId: string): Promise<ChatMessage[]> {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('duo_id', duoId)
+      .eq('intimate_mode_id', roomId)
+      .order('created_at', { ascending: true })
     if (error) throw toApiError(error)
     return (data ?? []) as ChatMessage[]
   },
@@ -220,20 +268,8 @@ export const api = {
     return null
   },
 
-  async claimAdmin(secret: string): Promise<boolean> {
-    try {
-      return await rpc<boolean>('claim_admin', { p_secret: secret })
-    } catch {
-      // Fallback direct si le secret correspond
-      if (['entrenous-admin', 'admin2026', 'admin'].includes(secret.trim())) {
-        const { data: userData } = await supabase.auth.getUser()
-        const uid = userData?.user?.id
-        if (uid) {
-          const { error } = await supabase.from('players').update({ is_admin: true }).eq('id', uid)
-          if (!error) return true
-        }
-      }
-      throw new Error('Mot de passe administrateur incorrect.')
-    }
-  },
+  getIntimateModeEnabled: () => rpc<boolean>('get_intimate_mode_enabled'),
+
+  setIntimateModeEnabled: (enabled: boolean) =>
+    rpc<boolean>('admin_set_intimate_mode_enabled', { p_enabled: enabled }),
 }

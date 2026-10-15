@@ -9,6 +9,8 @@ const DECISIONS = [
   'L’historique des questions du catalogue déjà posées est conservé par duo, pour empêcher toute répétition — même après fermeture du navigateur ou reconnexion.',
   'Sur cet appareil, l’application crée automatiquement et sans aucune inscription une identité locale, qui permet de retrouver ton duo.',
   'Les réponses et les messages ne sont accessibles qu’aux deux membres autorisés du duo.',
+  'Dans le mode de conversation très intime, le niveau d’envie est utilisé uniquement pour décider si le mode démarre, puis supprimé.',
+  'Les messages écrits dans le mode très intime restent dans l’historique privé du chat du duo après la fin du mode.',
 ]
 
 const OPEN = [

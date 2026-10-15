@@ -94,9 +94,18 @@ export interface ChatMessage {
   id: string
   duo_id: string
   session_id: string | null
+  intimate_mode_id?: string | null
   sender_id: string
   body: string
   created_at: string
+}
+
+export interface IntimateModeSnapshot {
+  id: string
+  duo_id: string
+  state: 'consent' | 'active' | 'fallback' | 'ended'
+  fallback_session_id: string | null
+  has_submitted: boolean
 }
 
 export interface DrawResult {

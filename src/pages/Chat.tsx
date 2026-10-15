@@ -190,6 +190,7 @@ export function ChatPage() {
             >
               <div className="answer-box">{entry.m.body}</div>
               <div className="msg__meta">
+                {entry.m.intimate_mode_id && <span>Conversation très intime ·</span>}
                 <span>{new Date(entry.m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>

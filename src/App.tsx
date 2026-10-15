@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 import { isSupabaseConfigured } from './lib/supabase'
@@ -11,6 +12,10 @@ import Admin from './pages/Admin'
 import { PrivacyPage } from './pages/Privacy'
 import { InstallPage } from './pages/Install'
 import { GameEntryPage } from './pages/GameEntry'
+import { IntimateModePage } from './pages/IntimateMode'
+import { PrivacyWelcome } from './components/PrivacyWelcome'
+
+const PRIVACY_WELCOME_KEY = 'entre-nous:conversation-rules:v2'
 
 /** L'identité locale automatique n'a pas pu être créée (réglage Supabase). */
 function IdentityUnavailable({ message }: { message: string | null }) {
@@ -34,6 +39,13 @@ function IdentityUnavailable({ message }: { message: string | null }) {
 
 export function App() {
   const { session, loading, error } = useAuth()
+  const [privacyRead, setPrivacyRead] = useState(() => {
+    try {
+      return localStorage.getItem(PRIVACY_WELCOME_KEY) === 'read'
+    } catch {
+      return false
+    }
+  })
 
   if (!isSupabaseConfigured) {
     return <SetupRequired />
@@ -51,11 +63,16 @@ export function App() {
     return <IdentityUnavailable message={error} />
   }
 
+  if (!privacyRead) {
+    return <PrivacyWelcome onContinue={() => setPrivacyRead(true)} />
+  }
+
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/duo/:duoId" element={<DuoRoomPage />} />
       <Route path="/session/:sessionId" element={<SessionPage />} />
+      <Route path="/mode-intime/:roomId" element={<IntimateModePage />} />
       <Route path="/jeu" element={<GameEntryPage />} />
       <Route path="/chat" element={<ChatPage />} />
       <Route path="/chat/:duoId" element={<ChatPage />} />

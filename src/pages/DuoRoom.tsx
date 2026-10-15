@@ -5,7 +5,7 @@ import { ErrorAlert, Spinner } from '../components/feedback'
 import { api } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { currentDuo, currentSession } from '../lib/storage'
-import type { DuoSummary } from '../lib/types'
+import type { DuoSummary, IntimateModeSnapshot } from '../lib/types'
 
 export function DuoRoomPage() {
   const { duoId = '' } = useParams()
@@ -18,6 +18,8 @@ export function DuoRoomPage() {
     invite_revoked: boolean
   } | null>(null)
   const [activeSession, setActiveSession] = useState<{ id: string; state: string } | null>(null)
+  const [intimateMode, setIntimateMode] = useState<IntimateModeSnapshot | null>(null)
+  const [intimateModeEnabled, setIntimateModeEnabled] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -28,16 +30,26 @@ export function DuoRoomPage() {
       const duos = await api.myDuos()
       const found = duos.find((d) => d.id === duoId) ?? null
       setDuo(found)
+      if (!found) {
+        setIntimateMode(null)
+        setActiveSession(null)
+      }
       if (found) {
         currentDuo.set(found.id)
-        setInvite(await api.getDuoInvite(found.id))
-        const active = await api.getActiveSession(found.id)
+        const [nextInvite, active] = await Promise.all([
+          api.getDuoInvite(found.id),
+          api.getActiveSession(found.id),
+        ])
+        setInvite(nextInvite)
         if (active) {
           setActiveSession({ id: active.session.id, state: active.session.state })
           currentSession.set(active.session.id)
         } else {
           setActiveSession(null)
         }
+        const featureEnabled = await api.getIntimateModeEnabled()
+        setIntimateModeEnabled(featureEnabled)
+        setIntimateMode(featureEnabled ? await api.getOpenIntimateMode(found.id) : null)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Chargement impossible.')
@@ -74,6 +86,11 @@ export function DuoRoomPage() {
           }
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'intimate_mode_rooms', filter: `duo_id=eq.${duoId}` },
+        () => void load(),
+      )
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)
@@ -95,6 +112,20 @@ export function DuoRoomPage() {
       navigate(`/session/${snap.session.id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Impossible de créer la session.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function openIntimateMode() {
+    if (!duo) return
+    setBusy(true)
+    setError(null)
+    try {
+      const room = await api.createIntimateMode(duo.id)
+      navigate(`/mode-intime/${room.id}`)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Impossible de préparer ce mode.')
     } finally {
       setBusy(false)
     }
@@ -253,6 +284,51 @@ export function DuoRoomPage() {
             <button className="btn" onClick={startGame} disabled={busy || !duo.is_full}>
               {busy ? 'Préparation…' : 'Préparer une session'}
             </button>
+          </>
+        )}
+      </div>
+
+      <div className="card stack">
+        <h2>Conversation très intime</h2>
+        {!intimateModeEnabled ? (
+          <div className="alert alert--warn small">
+            Ce mode est verrouillé par l’administration. Les autres catégories du jeu restent accessibles.
+          </div>
+        ) : (
+          <>
+            <p className="small muted">
+              Un mode réservé aux adultes : une conversation libre qui ne
+              commence que si vous confirmez tous les deux votre accord.
+            </p>
+            {intimateMode ? (
+              <>
+                <div className="alert alert--info small">
+                  {intimateMode.state === 'active'
+                    ? 'Une conversation très intime est en cours.'
+                    : intimateMode.has_submitted
+                      ? 'Votre choix est enregistré, en attente de la suite.'
+                      : 'Une conversation très intime attend votre choix.'}
+                </div>
+                <button
+                  className="btn btn--soft"
+                  onClick={() => navigate(`/mode-intime/${intimateMode.id}`)}
+                >
+                  {intimateMode.state === 'active'
+                    ? 'Rejoindre la conversation'
+                    : intimateMode.has_submitted
+                      ? 'Voir l’attente'
+                      : 'Donner mon accord'}
+                </button>
+              </>
+            ) : (
+              <button
+                className="btn btn--soft"
+                onClick={() => void openIntimateMode()}
+                disabled={busy || !duo.is_full}
+              >
+                {busy ? 'Préparation…' : 'Ouvrir le mode très intime'}
+              </button>
+            )}
           </>
         )}
       </div>

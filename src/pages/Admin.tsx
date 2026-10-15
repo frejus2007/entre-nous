@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { api } from '../lib/api'
@@ -27,8 +27,8 @@ export default function Admin() {
   const user = session?.user ?? null
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null)
   const [checking, setChecking] = useState(true)
-  const [passcode, setPasscode] = useState('')
-  const [unlocking, setUnlocking] = useState(false)
+  const [intimateModeEnabled, setIntimateModeEnabled] = useState<boolean | null>(null)
+  const [updatingIntimateMode, setUpdatingIntimateMode] = useState(false)
   const [category, setCategory] = useState<QuestionCategory>('brise_glace')
   const [questionsText, setQuestionsText] = useState('')
   const [importing, setImporting] = useState(false)
@@ -51,8 +51,19 @@ export default function Admin() {
         const { data, error } = await supabase.rpc('is_admin')
         if (error) throw error
         setIsAdmin(!!data)
-      } catch (e: any) {
-        setError(e.message)
+        if (data) {
+          try {
+            setIntimateModeEnabled(await api.getIntimateModeEnabled())
+          } catch (featureError) {
+            setError(
+              featureError instanceof Error
+                ? `${featureError.message} Applique la migration 0015_admin_intimate_mode_lock.sql.`
+                : 'Applique la migration 0015_admin_intimate_mode_lock.sql.',
+            )
+          }
+        }
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'Vérification des droits impossible.')
         setIsAdmin(false)
       } finally {
         setChecking(false)
@@ -61,18 +72,16 @@ export default function Admin() {
     checkAdmin()
   }, [user])
 
-  const handleUnlock = async (e: FormEvent) => {
-    e.preventDefault()
-    setUnlocking(true)
+  const toggleIntimateMode = async () => {
+    if (intimateModeEnabled === null) return
+    setUpdatingIntimateMode(true)
     setError(null)
     try {
-      await api.claimAdmin(passcode)
-      setIsAdmin(true)
-      setPasscode('')
-    } catch (err: any) {
-      setError(err instanceof Error ? err.message : 'Code incorrect.')
+      setIntimateModeEnabled(await api.setIntimateModeEnabled(!intimateModeEnabled))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Modification impossible.')
     } finally {
-      setUnlocking(false)
+      setUpdatingIntimateMode(false)
     }
   }
 
@@ -143,24 +152,10 @@ export default function Admin() {
           </div>
           <h1>Espace Administrateur</h1>
           <p className="small muted">
-            Cet espace permet d’ajouter des questions au catalogue. Pour y accéder, saisis le mot de passe administrateur.
+            L’accès administrateur est attribué par le responsable du projet.
+            Aucun code partagé ne permet de s’accorder soi-même ces droits.
           </p>
           {error && <div className="alert alert--warn">{error}</div>}
-          <form onSubmit={handleUnlock} className="stack">
-            <label className="field">
-              <span className="label">Mot de passe</span>
-              <input
-                type="password"
-                className="input"
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
-                placeholder="Ex. entrenous-admin"
-              />
-            </label>
-            <button className="btn" type="submit" disabled={unlocking || !passcode.trim()}>
-              {unlocking ? 'Déverrouillage…' : 'Accéder à l’administration'}
-            </button>
-          </form>
         </div>
       </main>
     )
@@ -192,6 +187,40 @@ export default function Admin() {
             {error}
           </div>
         )}
+
+        <section className="card stack">
+          <div className="row row--between admin-feature-heading">
+            <div>
+              <h2>Mode « Conversation très intime »</h2>
+              <p className="small muted">
+                Ce mode est verrouillé par défaut. Seul un administrateur peut
+                l’activer ou le désactiver pour toute la plateforme.
+              </p>
+            </div>
+            {intimateModeEnabled !== null && (
+              <span className={`badge ${intimateModeEnabled ? 'badge--ok' : 'badge--off'}`}>
+                {intimateModeEnabled ? 'Activé' : 'Verrouillé'}
+              </span>
+            )}
+          </div>
+          <button
+            className={intimateModeEnabled ? 'btn btn--danger' : 'btn'}
+            type="button"
+            disabled={updatingIntimateMode || intimateModeEnabled === null}
+            onClick={() => void toggleIntimateMode()}
+          >
+            {updatingIntimateMode
+              ? 'Mise à jour…'
+              : intimateModeEnabled
+                ? 'Verrouiller le mode maintenant'
+                : 'Déverrouiller le mode'}
+          </button>
+          <p className="small muted">
+            Le verrouillage ferme immédiatement les salons ouverts et efface les
+            niveaux de préparation temporaires. Les messages déjà envoyés restent
+            dans l’historique du duo.
+          </p>
+        </section>
 
         <section
           style={{

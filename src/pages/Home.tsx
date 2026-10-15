@@ -64,16 +64,24 @@ export function HomePage() {
       <OfflineBanner />
       <ErrorAlert message={error} />
 
-      <div className="card">
-        <h1>Deux personnes, de vraies questions</h1>
-        <p className="muted">
+      <section className="card home-hero">
+        <span className="home-hero__eyebrow">Un espace à deux</span>
+        <h1>Rapprochez-vous, à votre rythme.</h1>
+        <p>
           Créez un duo privé, répondez par écrit, et discutez dans un chat qui
           n’interfère jamais avec le jeu.
         </p>
-      </div>
+        <div className="home-hero__note">Vos échanges. Vos règles. Votre rythme.</div>
+      </section>
 
-      <div className="card stack">
-        <h2>Créer un duo</h2>
+      <div className="card stack home-action">
+        <div className="home-action__heading">
+          <span className="home-action__icon" aria-hidden="true">✦</span>
+          <div>
+            <h2>Créer un duo</h2>
+            <p className="small muted">Un espace privé à partager avec une seule personne.</p>
+          </div>
+        </div>
         <form className="stack" onSubmit={handleCreate}>
           <label className="field">
             <span className="label">Nom du duo (optionnel)</span>
@@ -101,8 +109,14 @@ export function HomePage() {
         </form>
       </div>
 
-      <div className="card stack">
-        <h2>Rejoindre un duo</h2>
+      <div className="card stack home-action">
+        <div className="home-action__heading">
+          <span className="home-action__icon home-action__icon--soft" aria-hidden="true">↗</span>
+          <div>
+            <h2>Rejoindre un duo</h2>
+            <p className="small muted">Entre le code reçu de ton partenaire.</p>
+          </div>
+        </div>
         <form className="stack" onSubmit={handleJoin}>
           <label className="field">
             <span className="label">Code d’invitation</span>
@@ -120,7 +134,7 @@ export function HomePage() {
         </form>
       </div>
 
-      <div className="card stack">
+      <div className="card stack home-action">
         <h2>Mes duos</h2>
         {duos === null ? (
           <Spinner label="Chargement de tes duos…" />
