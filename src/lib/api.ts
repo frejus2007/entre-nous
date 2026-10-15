@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type {
   ChatMessage,
+  ChatReaction,
   DuoSummary,
   QuestionCategory,
   SessionSnapshot,
@@ -48,6 +49,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   EMPTY_ANSWER: 'La réponse ne peut pas être vide.',
   EMPTY_MESSAGE: 'Le message ne peut pas être vide.',
   MESSAGE_TOO_LONG: 'Le message est trop long.',
+  MESSAGE_NOT_FOUND: 'Ce message n’existe plus.',
+  INVALID_REACTION: 'Cette réaction n’est pas disponible.',
   QUESTION_TOO_SHORT: 'La question est trop courte.',
   QUESTION_NOT_ALLOWED:
     'Cette question contient un contenu non autorisé (demande de photo intime, menace ou contrainte).',
@@ -186,6 +189,12 @@ export const api = {
       p_session: sessionId ?? null,
     }),
 
+  toggleMessageReaction: (messageId: string, reaction: string) =>
+    rpc<{ message_id: string; reaction: string | null }>('toggle_message_reaction', {
+      p_message: messageId,
+      p_reaction: reaction,
+    }),
+
   async listMessages(duoId: string, limit = 100): Promise<ChatMessage[]> {
     const { data, error } = await supabase
       .from('messages')
@@ -195,6 +204,15 @@ export const api = {
       .limit(limit)
     if (error) throw toApiError(error)
     return (data ?? []) as ChatMessage[]
+  },
+
+  async listMessageReactions(duoId: string): Promise<ChatReaction[]> {
+    const { data, error } = await supabase
+      .from('message_reactions')
+      .select('*')
+      .eq('duo_id', duoId)
+    if (error) throw toApiError(error)
+    return (data ?? []) as ChatReaction[]
   },
 
   // ------------------------------------------------------------------ Sync & Admin

@@ -6,7 +6,9 @@ import { api } from '../lib/api'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { currentDuo, currentSession } from '../lib/storage'
-import type { ChatMessage, DuoSummary } from '../lib/types'
+import type { ChatMessage, ChatReaction, DuoSummary } from '../lib/types'
+
+const CHAT_REACTIONS = ['❤️', '😂', '🥰', '👏', '👍'] as const
 
 type PendingStatus = 'sending' | 'failed'
 interface PendingMessage {
@@ -24,6 +26,8 @@ export function ChatPage() {
 
   const [duo, setDuo] = useState<DuoSummary | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [reactions, setReactions] = useState<ChatReaction[]>([])
+  const [busyReactions, setBusyReactions] = useState<Set<string>>(() => new Set())
   const [pending, setPending] = useState<PendingMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -53,12 +57,21 @@ export function ChatPage() {
 
   const loadMessages = useCallback(async (id: string) => {
     try {
-      setMessages(await api.listMessages(id))
+      const [nextMessages, nextReactions] = await Promise.all([
+        api.listMessages(id),
+        api.listMessageReactions(id),
+      ])
+      setMessages(nextMessages)
+      setReactions(nextReactions)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Messages indisponibles.')
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  const loadReactions = useCallback(async (id: string) => {
+    setReactions(await api.listMessageReactions(id))
   }, [])
 
   useEffect(() => {
@@ -80,11 +93,20 @@ export function ChatPage() {
           setMessages((prev) => (prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]))
         },
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'message_reactions', filter: `duo_id=eq.${duo.id}` },
+        () => {
+          void loadReactions(duo.id).catch((err: unknown) => {
+            setError(err instanceof Error ? err.message : 'Réactions indisponibles.')
+          })
+        },
+      )
       .subscribe()
     return () => {
       void supabase.removeChannel(channel)
     }
-  }, [duo])
+  }, [duo, loadReactions])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -119,6 +141,25 @@ export function ChatPage() {
     [duo],
   )
 
+  async function toggleReaction(messageId: string, reaction: string) {
+    if (!duo) return
+    const key = messageId
+    setBusyReactions((prev) => new Set(prev).add(key))
+    try {
+      await api.toggleMessageReaction(messageId, reaction)
+      await loadReactions(duo.id)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Réaction impossible. Réessaie.')
+    } finally {
+      setBusyReactions((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const body = draft
@@ -134,6 +175,21 @@ export function ChatPage() {
       ].sort((a, b) => a.at.localeCompare(b.at)),
     [messages, pending],
   )
+  const reactionSummary = useMemo(() => {
+    const summary = new Map<string, Map<string, { count: number; selected: boolean }>>()
+    for (const item of reactions) {
+      let byEmoji = summary.get(item.message_id)
+      if (!byEmoji) {
+        byEmoji = new Map()
+        summary.set(item.message_id, byEmoji)
+      }
+      const current = byEmoji.get(item.reaction) ?? { count: 0, selected: false }
+      current.count += 1
+      current.selected ||= item.user_id === myId
+      byEmoji.set(item.reaction, current)
+    }
+    return summary
+  }, [reactions, myId])
 
   if (loading) {
     return (
@@ -192,6 +248,24 @@ export function ChatPage() {
               <div className="answer-box">{entry.m.body}</div>
               <div className="msg__meta">
                 <span>{new Date(entry.m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+              </div>
+              <div className="msg-reactions" aria-label="Réactions au message">
+                {CHAT_REACTIONS.map((emoji) => {
+                  const reaction = reactionSummary.get(entry.m.id)?.get(emoji)
+                  return (
+                    <button
+                      key={emoji}
+                      type="button"
+                      className={`msg-reaction${reaction?.selected ? ' msg-reaction--selected' : ''}`}
+                      aria-label={`Réagir avec ${emoji}${reaction ? `, ${reaction.count} réaction${reaction.count > 1 ? 's' : ''}` : ''}`}
+                      aria-pressed={reaction?.selected ?? false}
+                      disabled={busyReactions.has(entry.m.id)}
+                      onClick={() => void toggleReaction(entry.m.id, emoji)}
+                    >
+                      {emoji}{reaction ? ` ${reaction.count}` : ''}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           ) : (
