@@ -2776,3 +2776,10 @@ begin
   end if;
 end;
 $$;
+
+-- ############################################################################
+-- ##  supabase/migrations/0013_remove_chat_reactions.sql
+-- ############################################################################
+
+drop function if exists public.toggle_message_reaction(uuid, text);
+drop table if exists public.message_reactions cascade;

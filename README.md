@@ -56,7 +56,7 @@ migrations.
 #### Option C — manuellement, fichier par fichier
 
 Dans le SQL Editor, exécute les fichiers de `supabase/migrations/` **un par un,
-dans l'ordre** : les migrations `0001` à `0012`.
+dans l'ordre** : les migrations `0001` à `0013`.
 Les migrations de catalogue `0004` et `0006` sont historiques ; `0009` supprime
 leurs questions afin que le catalogue soit vide au terme de l'installation.
 
@@ -71,9 +71,9 @@ propriétaire avant le démarrage d’une partie.
 La migration `0011_custom_question_immediate.sql` affiche immédiatement une
 question personnalisée dans le tour en cours, au lieu de la mettre en attente
 dans le prochain tirage.
-La migration `0012_chat_reactions.sql` ajoute les réactions aux messages du
-chat privé (cinq réactions, une par personne et par message), avec
-synchronisation en temps réel entre les deux appareils.
+La migration `0013_remove_chat_reactions.sql` supprime la fonctionnalité de
+réactions du chat et nettoie les données associées si la migration `0012` avait
+déjà été appliquée.
 
 > ⚠️ L'ordre compte : `0002` crée les fonctions d'autorisation utilisées par
 > `0003`, et `0003` crée les fonctions RPC dont dépend `0005`. Si tu te trompes
@@ -200,7 +200,6 @@ Tables (cahier des charges §18) : `players`, `duos`, `duo_members`, `sessions`,
 | Consentement des deux (§7.1) | `set_consent()` + contrôle serveur avant tout tirage 18+ |
 | Retrait immédiat (§7.2) | met la session en pause si une question intime est en cours |
 | Chat indépendant du jeu (§11.2) | `send_message()` ne touche jamais l'état du jeu |
-| Réactions de chat | `toggle_message_reaction()` vérifie l'appartenance au duo ; les réactions sont limitées à cinq choix et synchronisées en temps réel |
 | Suppression réelle des questions perso (§9) | `DELETE` serveur dans `end_session()` |
 | Résistance aux doubles clics (§16.13) | contrainte « un seul tour ouvert » + transactions |
 | Reprise après reconnexion (§20) | `get_session_snapshot()` renvoie l'état réel serveur |

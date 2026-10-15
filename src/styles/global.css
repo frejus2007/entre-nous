@@ -545,37 +545,6 @@ a {
   border-color: var(--danger);
 }
 
-.msg-reactions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-top: var(--space-2);
-}
-
-.msg-reaction {
-  min-height: 32px;
-  padding: 2px 8px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  font-size: 0.75rem;
-  line-height: 1.2;
-  cursor: pointer;
-}
-
-.msg-reaction:disabled {
-  cursor: wait;
-  opacity: 0.65;
-}
-
-.msg-reaction--selected {
-  border-color: var(--plum);
-  background: var(--rose-soft);
-  color: var(--plum);
-}
-
 .chat-composer {
   position: sticky;
   bottom: calc(78px + env(safe-area-inset-bottom));

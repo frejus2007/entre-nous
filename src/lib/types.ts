@@ -99,14 +99,6 @@ export interface ChatMessage {
   created_at: string
 }
 
-export interface ChatReaction {
-  message_id: string
-  duo_id: string
-  user_id: string
-  reaction: string
-  created_at: string
-}
-
 export interface DrawResult {
   ok: boolean
   reason?: 'catalog_exhausted'
